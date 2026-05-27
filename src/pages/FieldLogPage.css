@@ -1,0 +1,117 @@
+.field-log-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-background);
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.field-log-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.field-log-page__back {
+  min-height: unset;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-primary);
+  padding: var(--space-2) var(--space-3);
+}
+
+.field-log-page__title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--color-primary);
+}
+
+.field-log-page__stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-6);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  animation: fadeInUp 300ms ease both;
+}
+
+.field-log-page__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.field-log-page__stat-val {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.field-log-page__stat-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.field-log-page__stat-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--color-border);
+}
+
+.field-log-page__list {
+  flex: 1;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+}
+
+.field-log-page__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-12) var(--space-8);
+  text-align: center;
+}
+
+.field-log-page__empty-icon {
+  font-size: 3rem;
+}
+
+.field-log-page__empty-title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--color-primary);
+}
+
+.field-log-page__empty-text {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  max-width: 240px;
+}
+
+.field-log-page__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-surface-alt);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

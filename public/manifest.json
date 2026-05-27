@@ -1,0 +1,14 @@
+{
+  "name": "Plant Disease Scanner",
+  "short_name": "LeafScan",
+  "description": "Scan crop leaves for disease diagnosis. Works offline.",
+  "theme_color": "#2D5016",
+  "background_color": "#F5F0E8",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
