@@ -4,6 +4,13 @@ import '@tensorflow/tfjs-backend-webgl';
 import { diseaseData } from '../data/diseaseData';
 import type { Prediction } from '../types';
 
+interface ModelInfo {
+  class_names: string[];
+  num_classes: number;
+  input_size: number;
+  input_range: [number, number];
+}
+
 interface UseModelInferenceReturn {
   predict: (imageElement: HTMLImageElement | HTMLCanvasElement) => Promise<Prediction[]>;
   loadModel: () => Promise<void>;
@@ -18,113 +25,127 @@ export function useModelInference(): UseModelInferenceReturn {
   const [loadProgress, setLoadProgress] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const modelRef = useRef<tf.GraphModel | tf.LayersModel | null>(null);
+  const modelRef = useRef<tf.GraphModel | null>(null);
+  const modelInfoRef = useRef<ModelInfo | null>(null);
 
   const loadModel = useCallback(async () => {
     if (modelRef.current || isLoading) return;
-
     setIsLoading(true);
     setError(null);
     setLoadProgress(0);
 
     try {
-      // Set backend to WebGL for GPU acceleration
       await tf.setBackend('webgl');
       await tf.ready();
-      setLoadProgress(20);
+      setLoadProgress(10);
 
-      // Try to load the real model first; fall back to demo mode
+      // Try to load model_info.json first
       try {
-        const model = await tf.loadGraphModel('/model/model.json', {
-          onProgress: (fraction) => {
-            setLoadProgress(20 + Math.round(fraction * 75));
-          },
-        });
-        modelRef.current = model;
+        const infoRes = await fetch('/model/model_info.json');
+        if (infoRes.ok) {
+          modelInfoRef.current = await infoRes.json();
+          console.log('Model info loaded:', modelInfoRef.current);
+        }
       } catch {
-        // Model not found — run in demo mode with realistic mock predictions
-        console.warn('Model file not found — running in DEMO MODE with simulated predictions');
-        modelRef.current = null; // signals demo mode
+        // model_info.json optional
       }
 
+      // Load TF.js model
+      const model = await tf.loadGraphModel('/model/model.json', {
+        onProgress: (fraction) => {
+          setLoadProgress(10 + Math.round(fraction * 88));
+        },
+      });
+      modelRef.current = model;
       setLoadProgress(100);
       setIsReady(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load model');
-      setIsReady(false);
+      console.log('Real model loaded successfully');
+    } catch {
+      // Fall back to demo mode
+      console.warn('Model not found — running in DEMO MODE');
+      modelRef.current = null;
+      setLoadProgress(100);
+      setIsReady(true);
     } finally {
       setIsLoading(false);
     }
   }, [isLoading]);
 
   /**
-   * Preprocess an image element to a [1, 224, 224, 3] tensor normalised to [0, 1].
+   * Map a class index to a Prediction using model_info.json if available,
+   * falling back to the built-in diseaseData mapping.
    */
-  function preprocessImage(imageEl: HTMLImageElement | HTMLCanvasElement): tf.Tensor4D {
-    return tf.tidy(() => {
-      const tensor = tf.browser.fromPixels(imageEl);           // [H, W, 3]
-      const resized = tf.image.resizeBilinear(tensor, [224, 224]); // [224, 224, 3]
-      const normalized = resized.div(255.0);                   // [0, 1]
-      return normalized.expandDims(0) as tf.Tensor4D;          // [1, 224, 224, 3]
-    });
+  function indexToPrediction(index: number, confidence: number): Prediction {
+    // If we have model_info with class names, parse them
+    if (modelInfoRef.current?.class_names) {
+      const rawName = modelInfoRef.current.class_names[index] ?? '';
+      // PlantVillage format: "Tomato___Early_blight" → crop=Tomato, name=Early blight
+      const parts = rawName.split('___');
+      const crop = parts[0]?.replace(/_/g, ' ').replace(/,.*/, '').trim() ?? 'Unknown';
+      const diseaseName = parts[1]?.replace(/_/g, ' ').trim() ?? rawName;
+
+      // Try to find matching disease data
+      const disease = Object.values(diseaseData).find(
+        d => d.name.toLowerCase() === diseaseName.toLowerCase() && d.crop.toLowerCase() === crop.toLowerCase()
+      ) ?? Object.values(diseaseData).find(
+        d => rawName.toLowerCase().includes(d.name.toLowerCase().split(' ')[0].toLowerCase())
+      ) ?? diseaseData[index % 38] ?? diseaseData[37];
+
+      return { diseaseLabel: disease.name, confidence, disease };
+    }
+
+    // Fallback: use diseaseData index directly
+    const disease = diseaseData[index] ?? diseaseData[37];
+    return { diseaseLabel: disease.name, confidence, disease };
   }
 
   /**
-   * Demo mode: generate realistic-looking predictions based on image data.
-   * Creates deterministic results per-image so repeated scans of same image are consistent.
+   * Demo mode predictions — deterministic per image dimensions.
    */
   function getDemoPredictions(imageEl: HTMLImageElement | HTMLCanvasElement): Prediction[] {
-    // Use image dimensions as a simple hash for deterministic demo results
-    const hash = (imageEl.width * 31 + imageEl.height * 17) % 38;
-    const topIndex = hash;
-    const second = (hash + 7) % 38;
-    const third = (hash + 13) % 38;
-
+    const hash = (imageEl.width * 31 + imageEl.height * 17 + 7) % 38;
     return [
-      { diseaseLabel: diseaseData[topIndex]?.name ?? 'Unknown', confidence: 0.82, disease: diseaseData[topIndex] ?? diseaseData[37] },
-      { diseaseLabel: diseaseData[second]?.name ?? 'Unknown', confidence: 0.12, disease: diseaseData[second] ?? diseaseData[37] },
-      { diseaseLabel: diseaseData[third]?.name ?? 'Unknown', confidence: 0.04, disease: diseaseData[third] ?? diseaseData[37] },
+      indexToPrediction(hash, 0.84),
+      indexToPrediction((hash + 7) % 38, 0.10),
+      indexToPrediction((hash + 15) % 38, 0.04),
     ];
   }
 
-  /**
-   * Run inference on an image element.
-   * Returns top-3 predictions sorted by confidence descending.
-   */
   const predict = useCallback(async (
     imageEl: HTMLImageElement | HTMLCanvasElement
   ): Promise<Prediction[]> => {
     if (!isReady) throw new Error('Model not ready');
 
-    // Demo mode when model file is not available
     if (!modelRef.current) {
-      // Simulate 1.5s inference time
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(r => setTimeout(r, 1200));
       return getDemoPredictions(imageEl);
     }
 
-    const inputTensor = preprocessImage(imageEl);
+    const imgSize = modelInfoRef.current?.input_size ?? 224;
+    const inputRange = modelInfoRef.current?.input_range ?? [0, 255];
+
+    const inputTensor = tf.tidy(() => {
+      const tensor = tf.browser.fromPixels(imageEl);
+      const resized = tf.image.resizeBilinear(tensor, [imgSize, imgSize]);
+      // Normalize based on model's expected input range
+      const normalized = inputRange[1] === 1
+        ? resized.div(255.0)
+        : resized.toFloat();
+      return normalized.expandDims(0) as tf.Tensor4D;
+    });
 
     try {
       const output = modelRef.current.predict(inputTensor) as tf.Tensor;
-      const probabilities = await output.data();
+      const probabilities = Array.from(await output.data());
 
-      // Get top-3 indices by confidence
-      const indexed = Array.from(probabilities).map((p, i) => ({ index: i, prob: p }));
-      indexed.sort((a, b) => b.prob - a.prob);
+      const indexed = probabilities.map((p, i) => ({ i, p }));
+      indexed.sort((a, b) => b.p - a.p);
       const top3 = indexed.slice(0, 3);
 
-      const predictions: Prediction[] = top3.map(({ index, prob }) => ({
-        diseaseLabel: diseaseData[index]?.name ?? `Class ${index}`,
-        confidence: Math.round(prob * 100) / 100,
-        disease: diseaseData[index] ?? diseaseData[37],
-      }));
-
-      // Cleanup tensors
       inputTensor.dispose();
       output.dispose();
 
-      return predictions;
+      return top3.map(({ i, p }) => indexToPrediction(i, Math.round(p * 100) / 100));
     } catch (err) {
       inputTensor.dispose();
       throw err;
