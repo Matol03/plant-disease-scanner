@@ -3,16 +3,17 @@ import { OfflineBadge } from '../components/OfflineBadge';
 import './HomePage.css';
 
 interface HomePageProps {
+  keyIsEnvLocked?: boolean;
   onStart: () => void;
   onChangeKey: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onStart, onChangeKey }) => {
+export const HomePage: React.FC<HomePageProps> = ({ onStart, onChangeKey, keyIsEnvLocked }) => {
   return (
     <div className="home-page">
       <header className="home-page__header">
         <OfflineBadge />
-        <button className="home-page__key-btn" onClick={onChangeKey} title="Change API key">
+        <button className={`home-page__key-btn${keyIsEnvLocked ? " hidden" : ""}`} onClick={onChangeKey} title="Change API key">
           🔑
         </button>
       </header>
