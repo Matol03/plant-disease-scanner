@@ -1,0 +1,107 @@
+.apikey-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: linear-gradient(160deg, #f5f0e8 0%, #e8efe0 100%);
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.apikey-page__card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-8);
+}
+
+.apikey-page__icon {
+  font-size: 2.5rem;
+  text-align: center;
+}
+
+.apikey-page__title {
+  font-size: var(--text-3xl);
+  text-align: center;
+  color: var(--color-primary);
+}
+
+.apikey-page__subtitle {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.apikey-page__steps {
+  background: var(--color-background);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+}
+
+.apikey-page__steps-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-3);
+}
+
+.apikey-page__step-list {
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.apikey-page__step-list li {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.apikey-page__input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.apikey-page__input {
+  width: 100%;
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: monospace;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  outline: none;
+  transition: border-color 150ms;
+  min-height: var(--touch-min);
+}
+
+.apikey-page__input:focus {
+  border-color: var(--color-primary);
+}
+
+.apikey-page__error {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  font-weight: 500;
+}
+
+.apikey-page__btn {
+  font-size: var(--text-lg);
+}
+
+.apikey-page__note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.5;
+}

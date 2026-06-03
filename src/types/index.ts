@@ -18,6 +18,14 @@ export interface Prediction {
   disease: Disease;
 }
 
+export interface AgentResult {
+  predictions: Prediction[];
+  reasoning: string;
+  severity: 'none' | 'mild' | 'moderate' | 'severe';
+  urgency: 'monitor' | 'treat_soon' | 'treat_immediately';
+  additionalAdvice: string;
+}
+
 export interface DiagnosisRecord {
   id?: number;
   imageBlob: Blob;
@@ -26,6 +34,9 @@ export interface DiagnosisRecord {
   timestamp: number;
   gps?: { lat: number; lng: number };
   cropName: string;
+  reasoning?: string;
+  severity?: string;
+  urgency?: string;
 }
 
-export type AppState = 'home' | 'camera' | 'processing' | 'result' | 'log';
+export type AppState = 'setup' | 'home' | 'camera' | 'processing' | 'result' | 'log';

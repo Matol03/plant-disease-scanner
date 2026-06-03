@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { DiagnosisCard } from '../components/DiagnosisCard';
-import type { Prediction } from '../types';
+import type { AgentResult } from '../types';
 import { saveDiagnosis } from '../utils/db';
 import './ResultPage.css';
 
 interface ResultPageProps {
-  predictions: Prediction[];
+  agentResult: AgentResult;
   imageUrl: string;
   imageCanvas: HTMLCanvasElement;
   onRetry: () => void;
@@ -13,11 +13,7 @@ interface ResultPageProps {
 }
 
 export const ResultPage: React.FC<ResultPageProps> = ({
-  predictions,
-  imageUrl,
-  imageCanvas,
-  onRetry,
-  onViewLog,
+  agentResult, imageUrl, imageCanvas, onRetry, onViewLog,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -28,13 +24,16 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     try {
       imageCanvas.toBlob(async (blob) => {
         if (!blob) return;
-        const top = predictions[0];
+        const top = agentResult.predictions[0];
         await saveDiagnosis({
           imageBlob: blob,
           diseaseLabel: top.diseaseLabel,
           confidence: top.confidence,
           timestamp: Date.now(),
           cropName: top.disease.crop,
+          reasoning: agentResult.reasoning,
+          severity: agentResult.severity,
+          urgency: agentResult.urgency,
         });
         setSaved(true);
         setIsSaving(false);
@@ -53,11 +52,15 @@ export const ResultPage: React.FC<ResultPageProps> = ({
         </div>
       )}
       <DiagnosisCard
-        predictions={predictions}
+        predictions={agentResult.predictions}
         imageUrl={imageUrl}
         onSave={handleSave}
         onRetry={onRetry}
         isSaving={isSaving}
+        reasoning={agentResult.reasoning}
+        severity={agentResult.severity}
+        urgency={agentResult.urgency}
+        additionalAdvice={agentResult.additionalAdvice}
       />
     </div>
   );

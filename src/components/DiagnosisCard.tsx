@@ -8,6 +8,11 @@ interface DiagnosisCardProps {
   onSave: () => void;
   onRetry: () => void;
   isSaving?: boolean;
+  // AI agent extras
+  reasoning?: string;
+  severity?: 'none' | 'mild' | 'moderate' | 'severe';
+  urgency?: 'monitor' | 'treat_soon' | 'treat_immediately';
+  additionalAdvice?: string;
 }
 
 const COST_LABEL: Record<string, string> = {
@@ -16,17 +21,29 @@ const COST_LABEL: Record<string, string> = {
   high: '🔴 High cost',
 };
 
+const SEVERITY_CONFIG = {
+  none:     { label: 'No Disease',  color: 'var(--color-success)', bg: 'rgba(22,101,52,0.1)' },
+  mild:     { label: 'Mild',        color: '#ca8a04',              bg: 'rgba(202,138,4,0.1)' },
+  moderate: { label: 'Moderate',    color: 'var(--color-accent)',  bg: 'rgba(193,126,45,0.1)' },
+  severe:   { label: 'Severe',      color: 'var(--color-danger)',  bg: 'rgba(185,28,28,0.1)' },
+};
+
+const URGENCY_CONFIG = {
+  monitor:             { label: '🟢 Monitor weekly',          color: 'var(--color-success)' },
+  treat_soon:          { label: '🟡 Treat within 1–2 weeks', color: '#ca8a04' },
+  treat_immediately:   { label: '🔴 Treat immediately',       color: 'var(--color-danger)' },
+};
+
 export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({
-  predictions,
-  imageUrl,
-  onSave,
-  onRetry,
-  isSaving,
+  predictions, imageUrl, onSave, onRetry, isSaving,
+  reasoning, severity = 'none', urgency = 'monitor', additionalAdvice,
 }) => {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const top = predictions[0];
   const isHealthy = top.disease.cause === 'No disease detected';
   const confidencePct = Math.round(top.confidence * 100);
+  const sev = SEVERITY_CONFIG[severity];
+  const urg = URGENCY_CONFIG[urgency];
 
   const confidenceColor =
     confidencePct >= 80 ? 'var(--color-success)' :
@@ -41,9 +58,11 @@ export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({
         <div className={`diagnosis-card__status-badge ${isHealthy ? 'healthy' : 'diseased'}`}>
           {isHealthy ? '✓ Healthy' : '⚠ Disease Detected'}
         </div>
+        {/* AI badge */}
+        <div className="diagnosis-card__ai-badge">🤖 Claude AI</div>
       </div>
 
-      {/* Disease name */}
+      {/* Disease name + confidence */}
       <div className="diagnosis-card__header">
         <div className="diagnosis-card__crop">{top.disease.crop}</div>
         <h2 className="diagnosis-card__name">{top.disease.name}</h2>
@@ -53,13 +72,32 @@ export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({
         </div>
       </div>
 
+      {/* Severity + Urgency pills */}
+      <div className="diagnosis-card__pills">
+        <span className="diagnosis-card__pill"
+          style={{ color: sev.color, background: sev.bg }}>
+          Severity: {sev.label}
+        </span>
+        <span className="diagnosis-card__pill"
+          style={{ color: urg.color, background: `${urg.color}18` }}>
+          {urg.label}
+        </span>
+      </div>
+
+      {/* AI Reasoning */}
+      {reasoning && (
+        <div className="diagnosis-card__reasoning">
+          <span className="diagnosis-card__label">🤖 Agent Reasoning</span>
+          <p>{reasoning}</p>
+        </div>
+      )}
+
       {/* Cause */}
       <div className="diagnosis-card__cause">
         <span className="diagnosis-card__label">Cause</span>
         <p>{top.disease.cause}</p>
       </div>
 
-      {/* Description */}
       <p className="diagnosis-card__description">{top.disease.description}</p>
 
       {/* Treatment steps */}
@@ -89,7 +127,15 @@ export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({
         </div>
       )}
 
-      {/* Alternative results */}
+      {/* Additional AI advice */}
+      {additionalAdvice && (
+        <div className="diagnosis-card__advice">
+          <span className="diagnosis-card__label">💡 Field Tip</span>
+          <p>{additionalAdvice}</p>
+        </div>
+      )}
+
+      {/* Alternative predictions */}
       {predictions.length > 1 && (
         <div className="diagnosis-card__alternatives">
           <span className="diagnosis-card__label">Other possibilities</span>
@@ -107,7 +153,7 @@ export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({
       {/* Actions */}
       <div className="diagnosis-card__actions">
         <button className="btn-primary" onClick={onSave} disabled={isSaving}>
-          {isSaving ? 'Saving...' : '💾 Save to Field Log'}
+          {isSaving ? 'Saving…' : '💾 Save to Field Log'}
         </button>
         <button className="btn-secondary" onClick={onRetry}>
           📷 Scan Another
