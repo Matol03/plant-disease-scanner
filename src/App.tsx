@@ -7,8 +7,8 @@ import { ProcessingPage } from './pages/ProcessingPage';
 import { ResultPage } from './pages/ResultPage';
 import { FieldLogPage } from './pages/FieldLogPage';
 import type { AgentResult, AppState } from './types';
+import './App.css';
 
-// Key priority: 1) Vite env var (set in Vercel dashboard), 2) localStorage (user-entered)
 const ENV_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
 
 function getStoredKey(): string {
@@ -20,10 +20,10 @@ export default function App() {
   const [capturedCanvas, setCapturedCanvas] = useState<HTMLCanvasElement | null>(null);
   const [capturedImageUrl, setCapturedImageUrl] = useState<string>('');
   const [agentResult, setAgentResult] = useState<AgentResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const agent = useAIAgent();
 
-  // On mount: check for stored or env key and skip setup if present
   useEffect(() => {
     const key = getStoredKey();
     if (key) {
@@ -40,6 +40,7 @@ export default function App() {
   const handleCapture = useCallback(async (canvas: HTMLCanvasElement, imageUrl: string) => {
     setCapturedCanvas(canvas);
     setCapturedImageUrl(imageUrl);
+    setAnalysisError(null);
     setAppState('processing');
 
     try {
@@ -47,19 +48,23 @@ export default function App() {
       setAgentResult(result);
       setAppState('result');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('401') || msg.includes('authentication') || msg.includes('API key')) {
+      const msg = err instanceof Error ? err.message : 'Analysis failed';
+
+      // Auth errors → back to key setup
+      if (msg.includes('401') || msg.toLowerCase().includes('authentication') || msg.toLowerCase().includes('invalid x-api-key')) {
         localStorage.removeItem('anthropic_api_key');
         sessionStorage.removeItem('anthropic_api_key');
         setAppState('setup');
-      } else {
-        setAppState('camera');
+        return;
       }
+
+      // All other errors → stay on processing page but show the error
+      setAnalysisError(msg);
+      setAppState('error');
     }
   }, [agent]);
 
   const handleChangeKey = useCallback(() => {
-    // Don't allow key change when key is baked in via env
     if (ENV_KEY) return;
     localStorage.removeItem('anthropic_api_key');
     sessionStorage.removeItem('anthropic_api_key');
@@ -69,6 +74,7 @@ export default function App() {
   return (
     <>
       {appState === 'setup' && <ApiKeyPage onSave={handleKeySet} />}
+
       {appState === 'home' && (
         <HomePage
           onStart={() => setAppState('camera')}
@@ -76,12 +82,36 @@ export default function App() {
           keyIsEnvLocked={!!ENV_KEY}
         />
       )}
+
       {appState === 'camera' && (
         <CameraPage onCapture={handleCapture} onBack={() => setAppState('home')} />
       )}
+
       {appState === 'processing' && capturedImageUrl && (
         <ProcessingPage imageUrl={capturedImageUrl} streamingText={agent.streamingText} />
       )}
+
+      {appState === 'error' && (
+        <div className="app-error">
+          <div className="app-error__card card">
+            <div className="app-error__icon">⚠️</div>
+            <h2>Analysis Failed</h2>
+            <p className="app-error__msg">{analysisError}</p>
+            {analysisError?.toLowerCase().includes('credit') && (
+              <p className="app-error__hint">
+                Add credits at <strong>console.anthropic.com</strong> → Billing
+              </p>
+            )}
+            <button className="btn-primary" onClick={() => setAppState('camera')}>
+              ← Try Again
+            </button>
+            <button className="btn-secondary" onClick={() => setAppState('home')}>
+              Home
+            </button>
+          </div>
+        </div>
+      )}
+
       {appState === 'result' && agentResult && capturedCanvas && capturedImageUrl && (
         <ResultPage
           agentResult={agentResult}
@@ -91,6 +121,7 @@ export default function App() {
           onViewLog={() => setAppState('log')}
         />
       )}
+
       {appState === 'log' && (
         <FieldLogPage onBack={() => setAppState('home')} onScan={() => setAppState('camera')} />
       )}

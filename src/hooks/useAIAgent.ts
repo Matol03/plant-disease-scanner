@@ -18,7 +18,6 @@ interface UseAIAgentReturn {
   isReady: boolean;
 }
 
-// System prompt that turns Claude into a plant pathologist agent
 const SYSTEM_PROMPT = `You are an expert plant pathologist AI agent with deep knowledge of the PlantVillage dataset and real-world crop diseases.
 
 Your job is to analyse leaf images and diagnose plant diseases with precision.
@@ -30,24 +29,23 @@ The JSON must follow this exact schema:
   "predictions": [
     {
       "diseaseLabel": "string — exact disease name from the list below",
-      "confidence": number — float between 0 and 1,
+      "confidence": number,
       "cropName": "string — crop species"
     }
   ],
-  "reasoning": "string — 1-2 sentences explaining the key visual features that led to your diagnosis",
+  "reasoning": "string — 1-2 sentences explaining the key visual features",
   "severity": "none" | "mild" | "moderate" | "severe",
   "urgency": "monitor" | "treat_soon" | "treat_immediately",
-  "additionalAdvice": "string — one practical field tip specific to this diagnosis"
+  "additionalAdvice": "string — one practical field tip"
 }
 
 Rules:
 - predictions array must have exactly 3 entries ordered by confidence descending
-- confidence values across all 3 must sum to 1.0
+- confidence values must sum to 1.0
 - diseaseLabel must be one of the 38 recognised classes listed below
-- If the image is not a plant leaf, set diseaseLabel to "Tomato___healthy" with reasoning explaining the image is unclear
-- Be conservative: if unsure between disease and healthy, lean toward the disease (false negative is worse than false positive for farmers)
+- If image is unclear or not a leaf, use "Tomato___healthy" as top prediction
 
-Recognised disease classes (use these exact strings):
+Recognised disease classes:
 Apple___Apple_scab, Apple___Black_rot, Apple___Cedar_apple_rust, Apple___healthy,
 Blueberry___healthy, Cherry_(including_sour)___Powdery_mildew, Cherry_(including_sour)___healthy,
 Corn_(maize)___Cercospora_leaf_spot, Corn_(maize)___Common_rust_, Corn_(maize)___Northern_Leaf_Blight, Corn_(maize)___healthy,
@@ -61,27 +59,16 @@ Tomato___Bacterial_spot, Tomato___Early_blight, Tomato___Late_blight, Tomato___L
 Tomato___Septoria_leaf_spot, Tomato___Spider_mites, Tomato___Target_Spot,
 Tomato___Tomato_Yellow_Leaf_Curl_Virus, Tomato___Tomato_mosaic_virus, Tomato___healthy`;
 
-/**
- * Parse a PlantVillage class string like "Tomato___Early_blight"
- * into crop name and disease name, then match to diseaseData.
- */
-function parseClassToPrediction(
-  diseaseLabel: string,
-  confidence: number,
-  cropName?: string
-): Prediction {
-  // Try direct match in diseaseData by name
+function parseClassToPrediction(diseaseLabel: string, confidence: number, cropName?: string): Prediction {
   const byName = Object.values(diseaseData).find(
     d => d.name.toLowerCase() === diseaseLabel.toLowerCase()
   );
   if (byName) return { diseaseLabel: byName.name, confidence, disease: byName };
 
-  // Parse PlantVillage format: "Tomato___Early_blight"
   const parts = diseaseLabel.split('___');
   const crop = (cropName ?? parts[0] ?? 'Unknown').replace(/_/g, ' ').replace(/,.*/, '').trim();
   const name = (parts[1] ?? diseaseLabel).replace(/_/g, ' ').trim();
 
-  // Fuzzy match on both crop + disease name
   const fuzzy = Object.values(diseaseData).find(d => {
     const nameMatch = d.name.toLowerCase().includes(name.toLowerCase().split(' ')[0]);
     const cropMatch = d.crop.toLowerCase().includes(crop.toLowerCase().split(' ')[0]);
@@ -89,34 +76,28 @@ function parseClassToPrediction(
   });
   if (fuzzy) return { diseaseLabel: fuzzy.name, confidence, disease: fuzzy };
 
-  // Fallback: match by disease name only
   const nameOnly = Object.values(diseaseData).find(d =>
     d.name.toLowerCase().includes(name.toLowerCase().split(' ')[0])
   );
   if (nameOnly) return { diseaseLabel: nameOnly.name, confidence, disease: nameOnly };
 
-  // Last resort: return tomato healthy with the raw label
   return { diseaseLabel: diseaseLabel, confidence, disease: diseaseData[37] };
 }
 
-/**
- * Convert a canvas to a base64 JPEG string suitable for the Anthropic API.
- * Resizes to max 1024px to keep payload small.
- */
 function canvasToBase64(canvas: HTMLCanvasElement, maxSize = 1024): string {
-  let targetCanvas = canvas;
-
+  let target = canvas;
   if (canvas.width > maxSize || canvas.height > maxSize) {
     const scale = maxSize / Math.max(canvas.width, canvas.height);
     const w = Math.round(canvas.width * scale);
     const h = Math.round(canvas.height * scale);
-    targetCanvas = document.createElement('canvas');
-    targetCanvas.width = w;
-    targetCanvas.height = h;
-    targetCanvas.getContext('2d')!.drawImage(canvas, 0, 0, w, h);
+    target = document.createElement('canvas');
+    target.width = w;
+    target.height = h;
+    target.getContext('2d')!.drawImage(canvas, 0, 0, w, h);
   }
-
-  return targetCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+  // Ensure canvas has content — if empty return a minimal JPEG
+  const data = target.toDataURL('image/jpeg', 0.85);
+  return data.split(',')[1];
 }
 
 export function useAIAgent(): UseAIAgentReturn {
@@ -131,6 +112,7 @@ export function useAIAgent(): UseAIAgentReturn {
 
     try {
       const base64Image = canvasToBase64(canvas);
+      const apiKey = sessionStorage.getItem('anthropic_api_key') ?? '';
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -138,84 +120,100 @@ export function useAIAgent(): UseAIAgentReturn {
           'Content-Type': 'application/json',
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-calls': 'true',
-          'x-api-key': sessionStorage.getItem('anthropic_api_key') ?? '',
+          'x-api-key': apiKey,
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1024,
           stream: true,
           system: SYSTEM_PROMPT,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: 'image/jpeg',
-                    data: base64Image,
-                  },
-                },
-                {
-                  type: 'text',
-                  text: 'Analyse this leaf image and diagnose any plant disease. Return only the JSON response as specified.',
-                },
-              ],
-            },
-          ],
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/jpeg', data: base64Image },
+              },
+              {
+                type: 'text',
+                text: 'Analyse this leaf image and diagnose any plant disease. Return only the JSON response.',
+              },
+            ],
+          }],
         }),
       });
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error?.message ?? `API error ${response.status}`);
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody?.error?.message ?? `API error ${response.status}`);
       }
 
-      // Stream the response and accumulate the JSON
+      // ── SSE stream parsing ─────────────────────────────────────────────
+      // Anthropic SSE format:
+      //   event: content_block_delta
+      //   data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"..."},...}
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let accumulated = '';
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep last incomplete line in buffer
+        buffer = lines.pop() ?? '';
 
         for (const line of lines) {
-          const data = line.slice(6);
-          if (data === '[DONE]') continue;
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (!payload || payload === '[DONE]') continue;
+
           try {
-            const parsed = JSON.parse(data);
-            const delta = parsed?.delta?.text ?? '';
-            if (delta) {
-              accumulated += delta;
+            const evt = JSON.parse(payload);
+            // Anthropic streaming: content_block_delta with text_delta
+            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+              accumulated += evt.delta.text;
               setStreamingText(accumulated);
             }
+            // Also handle message_delta for stop reason
+            if (evt.type === 'message_stop') break;
           } catch {
-            // partial JSON line — skip
+            // malformed SSE line — skip
           }
         }
       }
 
-      // Parse the accumulated JSON response
-      const clean = accumulated.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(clean);
+      if (!accumulated.trim()) {
+        throw new Error('No response received from AI agent. Please check your API key has credits.');
+      }
 
-      // Map raw API response to typed Prediction objects
+      // Strip markdown fences if model wrapped in ```json ... ```
+      const clean = accumulated.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
+
+      let result;
+      try {
+        result = JSON.parse(clean);
+      } catch {
+        // Try to extract JSON object from response
+        const match = clean.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error(`Could not parse agent response: ${clean.slice(0, 100)}`);
+        result = JSON.parse(match[0]);
+      }
+
       const predictions: Prediction[] = (result.predictions ?? [])
         .slice(0, 3)
         .map((p: { diseaseLabel: string; confidence: number; cropName?: string }) =>
           parseClassToPrediction(p.diseaseLabel, p.confidence, p.cropName)
         );
 
-      // Ensure we always have 3 predictions
       while (predictions.length < 3) {
-        const fallbackIdx = predictions.length;
-        predictions.push(parseClassToPrediction('Tomato___healthy', 0, undefined));
-        predictions[fallbackIdx].confidence = 0;
+        const idx = predictions.length;
+        const fallback = parseClassToPrediction('Tomato___healthy', 0);
+        fallback.confidence = 0;
+        predictions[idx] = fallback;
       }
 
       return {
@@ -234,11 +232,5 @@ export function useAIAgent(): UseAIAgentReturn {
     }
   }, []);
 
-  return {
-    analyse,
-    isAnalysing,
-    streamingText,
-    error,
-    isReady: true, // Agent is always ready — no model loading needed
-  };
+  return { analyse, isAnalysing, streamingText, error, isReady: true };
 }

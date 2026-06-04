@@ -182,3 +182,42 @@
   color: rgba(255,255,255,0.5);
   font-weight: 500;
 }
+
+/* ── Preview confirmation screen ─────────────────────────────────── */
+.camera-page__preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  background: #0a0a0a;
+}
+
+.camera-page__preview-label {
+  color: white;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-family: var(--font-display);
+}
+
+.camera-page__preview-img {
+  width: 100%;
+  max-height: 50dvh;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.camera-page__preview-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.camera-page__preview-actions .btn-secondary {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.8);
+}

@@ -39,4 +39,4 @@ export interface DiagnosisRecord {
   urgency?: string;
 }
 
-export type AppState = 'setup' | 'home' | 'camera' | 'processing' | 'result' | 'log';
+export type AppState = 'setup' | 'home' | 'camera' | 'processing' | 'result' | 'log' | 'error';
