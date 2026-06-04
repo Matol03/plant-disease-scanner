@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAIAgent } from './hooks/useAIAgent';
-import { ApiKeyPage } from './pages/ApiKeyPage';
 import { HomePage } from './pages/HomePage';
 import { CameraPage } from './pages/CameraPage';
 import { ProcessingPage } from './pages/ProcessingPage';
@@ -9,33 +8,17 @@ import { FieldLogPage } from './pages/FieldLogPage';
 import type { AgentResult, AppState } from './types';
 import './App.css';
 
-const ENV_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
-
-function getStoredKey(): string {
-  return ENV_KEY || localStorage.getItem('anthropic_api_key') || '';
-}
+// AppState no longer has 'setup' — API key is server-side only
+type LocalState = Exclude<AppState, 'setup'>;
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('setup');
+  const [appState, setAppState] = useState<LocalState>('home');
   const [capturedCanvas, setCapturedCanvas] = useState<HTMLCanvasElement | null>(null);
   const [capturedImageUrl, setCapturedImageUrl] = useState<string>('');
   const [agentResult, setAgentResult] = useState<AgentResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const agent = useAIAgent();
-
-  useEffect(() => {
-    const key = getStoredKey();
-    if (key) {
-      sessionStorage.setItem('anthropic_api_key', key);
-      setAppState('home');
-    }
-  }, []);
-
-  const handleKeySet = useCallback((key: string) => {
-    sessionStorage.setItem('anthropic_api_key', key);
-    setAppState('home');
-  }, []);
 
   const handleCapture = useCallback(async (canvas: HTMLCanvasElement, imageUrl: string) => {
     setCapturedCanvas(canvas);
@@ -49,37 +32,18 @@ export default function App() {
       setAppState('result');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Analysis failed';
-
-      // Auth errors → back to key setup
-      if (msg.includes('401') || msg.toLowerCase().includes('authentication') || msg.toLowerCase().includes('invalid x-api-key')) {
-        localStorage.removeItem('anthropic_api_key');
-        sessionStorage.removeItem('anthropic_api_key');
-        setAppState('setup');
-        return;
-      }
-
-      // All other errors → stay on processing page but show the error
       setAnalysisError(msg);
       setAppState('error');
     }
   }, [agent]);
 
-  const handleChangeKey = useCallback(() => {
-    if (ENV_KEY) return;
-    localStorage.removeItem('anthropic_api_key');
-    sessionStorage.removeItem('anthropic_api_key');
-    setAppState('setup');
-  }, []);
-
   return (
     <>
-      {appState === 'setup' && <ApiKeyPage onSave={handleKeySet} />}
-
       {appState === 'home' && (
         <HomePage
           onStart={() => setAppState('camera')}
-          onChangeKey={handleChangeKey}
-          keyIsEnvLocked={!!ENV_KEY}
+          onChangeKey={() => {}}
+          keyIsEnvLocked={true}
         />
       )}
 
