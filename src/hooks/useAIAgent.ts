@@ -19,7 +19,9 @@ interface UseAIAgentReturn {
 }
 
 function parseClassToPrediction(diseaseLabel: string, confidence: number, cropName?: string): Prediction {
-  const byName = Object.values(diseaseData).find(d => d.name.toLowerCase() === diseaseLabel.toLowerCase());
+  const byName = Object.values(diseaseData).find(
+    d => d.name.toLowerCase() === diseaseLabel.toLowerCase()
+  );
   if (byName) return { diseaseLabel: byName.name, confidence, disease: byName };
 
   const parts = diseaseLabel.split('___');
@@ -62,63 +64,28 @@ export function useAIAgent(): UseAIAgentReturn {
 
   const analyse = useCallback(async (canvas: HTMLCanvasElement): Promise<AgentAnalysis> => {
     setIsAnalysing(true);
-    setStreamingText('');
+    setStreamingText('Sending image to AI agent…');
     setError(null);
 
     try {
       const imageBase64 = canvasToBase64(canvas);
 
-      // Call server-side proxy at /api/analyse — avoids CORS on iOS Safari
       const response = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64, mediaType: 'image/jpeg' }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody?.error ?? `Server error ${response.status}`);
+        throw new Error(data?.error ?? `Server error ${response.status}`);
       }
 
-      // Parse SSE stream
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = '';
-      let buffer = '';
+      const result = data.result;
+      if (!result) throw new Error('No result returned from AI agent');
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6).trim();
-          if (!payload || payload === '[DONE]') continue;
-          try {
-            const evt = JSON.parse(payload);
-            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-              accumulated += evt.delta.text;
-              setStreamingText(accumulated);
-            }
-          } catch { /* partial line */ }
-        }
-      }
-
-      if (!accumulated.trim()) {
-        throw new Error('No response from AI agent. Check API key has credits at console.anthropic.com → Billing.');
-      }
-
-      const clean = accumulated.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
-      let result;
-      try {
-        result = JSON.parse(clean);
-      } catch {
-        const match = clean.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error(`Could not parse agent response: ${clean.slice(0, 120)}`);
-        result = JSON.parse(match[0]);
-      }
+      setStreamingText(JSON.stringify(result, null, 2));
 
       const predictions: Prediction[] = (result.predictions ?? [])
         .slice(0, 3)

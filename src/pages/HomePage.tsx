@@ -29,7 +29,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onChangeKey, keyIsE
             Claude AI diagnoses it in seconds.
           </p>
           <div className="home-page__agent-badge">
-            🤖 Powered by Claude Vision AI
+            🤖 Powered by Gemini 2.0 Flash · Free
           </div>
         </div>
 
@@ -57,8 +57,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onStart, onChangeKey, keyIsE
       </main>
 
       <footer className="home-page__footer">
-        <p>AI Agent: Claude claude-sonnet-4-20250514 Vision</p>
-        <p>No model download required · Works immediately</p>
+        <p>Gemini 2.0 Flash Vision · Free tier (1500 scans/day)</p>
+        <p>No credit card needed · 1500 free scans per day</p>
       </footer>
     </div>
   );

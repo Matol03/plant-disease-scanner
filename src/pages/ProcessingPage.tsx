@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './ProcessingPage.css';
 
 interface ProcessingPageProps {
@@ -6,12 +6,22 @@ interface ProcessingPageProps {
   streamingText?: string;
 }
 
-export const ProcessingPage: React.FC<ProcessingPageProps> = ({ imageUrl, streamingText }) => {
-  // Show partial JSON as a readable "thinking" indicator
-  const isThinking = streamingText && streamingText.length > 0;
-  const thinkingSnippet = streamingText
-    ? streamingText.replace(/[{}"]/g, '').replace(/\n/g, ' ').slice(-120)
-    : '';
+const STEPS = [
+  'Encoding leaf image…',
+  'Sending to Gemini Vision AI…',
+  'Identifying disease patterns…',
+  'Generating diagnosis…',
+];
+
+export const ProcessingPage: React.FC<ProcessingPageProps> = ({ imageUrl }) => {
+  const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStepIndex(i => (i < STEPS.length - 1 ? i + 1 : i));
+    }, 1800);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="processing-page">
@@ -25,26 +35,24 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ imageUrl, stream
           <div className="processing-page__spinner" />
         </div>
 
-        <h2 className="processing-page__title">AI Agent Analysing</h2>
+        <h2 className="processing-page__title">Analysing Leaf</h2>
 
-        {isThinking ? (
-          <div className="processing-page__stream">
-            <p className="processing-page__stream-label">Agent reasoning…</p>
-            <p className="processing-page__stream-text">{thinkingSnippet}</p>
-          </div>
-        ) : (
-          <>
-            <p className="processing-page__subtitle">Sending image to Claude vision AI…</p>
-            <div className="processing-page__steps">
-              {['Encoding leaf image', 'Querying plant pathologist AI', 'Parsing diagnosis'].map((step, i) => (
-                <div key={i} className="processing-page__step" style={{ animationDelay: `${i * 400}ms` }}>
-                  <div className="processing-page__step-dot" />
-                  <span>{step}</span>
-                </div>
-              ))}
+        <div className="processing-page__steps">
+          {STEPS.map((step, i) => (
+            <div
+              key={i}
+              className={`processing-page__step ${i <= stepIndex ? 'active' : ''}`}
+              style={{ animationDelay: `${i * 400}ms` }}
+            >
+              <div className={`processing-page__step-dot ${i === stepIndex ? 'current' : i < stepIndex ? 'done' : ''}`}>
+                {i < stepIndex ? '✓' : ''}
+              </div>
+              <span>{step}</span>
             </div>
-          </>
-        )}
+          ))}
+        </div>
+
+        <p className="processing-page__powered">Powered by Gemini 2.0 Flash · Free tier</p>
       </div>
     </div>
   );
