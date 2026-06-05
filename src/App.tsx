@@ -8,7 +8,6 @@ import { FieldLogPage } from './pages/FieldLogPage';
 import type { AgentResult, AppState } from './types';
 import './App.css';
 
-// AppState no longer has 'setup' — API key is server-side only
 type LocalState = Exclude<AppState, 'setup'>;
 
 export default function App() {
@@ -20,7 +19,7 @@ export default function App() {
 
   const agent = useAIAgent();
 
-  const handleCapture = useCallback(async (canvas: HTMLCanvasElement, imageUrl: string) => {
+  const runAnalysis = useCallback(async (canvas: HTMLCanvasElement, imageUrl: string) => {
     setCapturedCanvas(canvas);
     setCapturedImageUrl(imageUrl);
     setAnalysisError(null);
@@ -37,6 +36,18 @@ export default function App() {
     }
   }, [agent]);
 
+  // Retry with the same image — no need to re-scan
+  const handleRetryAnalysis = useCallback(() => {
+    if (capturedCanvas && capturedImageUrl) {
+      runAnalysis(capturedCanvas, capturedImageUrl);
+    } else {
+      setAppState('camera');
+    }
+  }, [capturedCanvas, capturedImageUrl, runAnalysis]);
+
+  const isRateLimit = analysisError?.toLowerCase().includes('rate') ||
+                      analysisError?.toLowerCase().includes('429');
+
   return (
     <>
       {appState === 'home' && (
@@ -48,7 +59,7 @@ export default function App() {
       )}
 
       {appState === 'camera' && (
-        <CameraPage onCapture={handleCapture} onBack={() => setAppState('home')} />
+        <CameraPage onCapture={runAnalysis} onBack={() => setAppState('home')} />
       )}
 
       {appState === 'processing' && capturedImageUrl && (
@@ -58,16 +69,20 @@ export default function App() {
       {appState === 'error' && (
         <div className="app-error">
           <div className="app-error__card card">
-            <div className="app-error__icon">⚠️</div>
-            <h2>Analysis Failed</h2>
+            <div className="app-error__icon">{isRateLimit ? '⏱️' : '⚠️'}</div>
+            <h2>{isRateLimit ? 'Too Many Requests' : 'Analysis Failed'}</h2>
             <p className="app-error__msg">{analysisError}</p>
-            {analysisError?.toLowerCase().includes('credit') && (
+            {isRateLimit && (
               <p className="app-error__hint">
-                Add credits at <strong>console.anthropic.com</strong> → Billing
+                The free AI tier allows 15 requests/minute. The app already retried with 3 different models. Wait a moment and try again.
               </p>
             )}
-            <button className="btn-primary" onClick={() => setAppState('camera')}>
-              ← Try Again
+            {/* Retry with same image — no need to re-scan */}
+            <button className="btn-primary" onClick={handleRetryAnalysis}>
+              🔄 Retry Same Photo
+            </button>
+            <button className="btn-secondary" onClick={() => setAppState('camera')}>
+              📷 Scan New Photo
             </button>
             <button className="btn-secondary" onClick={() => setAppState('home')}>
               Home
